@@ -39,8 +39,16 @@ def fetch_room_data(table, search_query=None, search_column=None):
             table.delete(item)
 
         # Thêm dữ liệu mới vào bảng
-        for item in data:
-            table.insert('', tb.END, values=(item[0], item[1], item[2], item[3], item[4]))
+        def format_vnd(amount):
+            return f"{amount:,.0f}".replace(',', '.') + " VND"
+
+        table.tag_configure('evenrow', background='#f2f2f2')
+        table.tag_configure('oddrow', background='#ffffff')
+        for i, item in enumerate(data):
+            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+            formatted_total = format_vnd(item[4])
+            table.insert('', tb.END, values=(item[0], item[1], item[2], item[3], formatted_total), tags=(tag,))
+
 
     except mysql.connector.Error as e:
         messagebox.showerror("Lỗi", f"Không thể lấy dữ liệu phòng: {e}")
@@ -225,7 +233,18 @@ def show_thuCungRoom(window, user_role, buttons, thuCungRoom_btn):
         return
 
     clicked(thuCungRoom_btn, buttons)
-
+    style = tb.Style()
+    style.configure("Custom.Treeview",
+                    borderwidth=1,
+                    relief="solid",  # Tạo viền quanh bảng
+                    rowheight=25,  # Điều chỉnh chiều cao hàng
+                    background="#fdfdfd",  # Màu nền
+                    foreground="#000")  # Màu chữ
+    style.configure("Custom.Treeview.Heading",
+                    background="#e1e1e1",  # Màu nền tiêu đề
+                    foreground="#000",  # Màu chữ tiêu đề
+                    borderwidth=1,
+                    relief="solid")  # Tạo viền cho tiêu đề
     thuCungRoom_frame = tb.Labelframe(window, bootstyle="secondary", text="Quản lý phòng thú cưng")
     thuCungRoom_frame.grid(row=0, column=1, columnspan=5, padx=5, pady=5, sticky="nsew")
     thuCungRoom_frame.columnconfigure(0, weight=1)
@@ -245,7 +264,8 @@ def show_thuCungRoom(window, user_role, buttons, thuCungRoom_btn):
     tree_scroll.grid(row=0, rowspan=6, column=3, sticky="wnes", padx=5, pady=30)
 
     columns = ("cID", "cName", "cStatus", "cType", "cPrice")
-    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set)
+    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set,
+                        style="Custom.Treeview")
     tree_scroll.config(command=table.yview)
 
     table.heading("cID", text="ID")

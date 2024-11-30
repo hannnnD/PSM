@@ -46,22 +46,20 @@ def main(user_role, emp_id):
         return button
 
     # Danh sách các nút
-    buttons = []
-    buttons.append(create_button(menu_frame, "img/stats_light.png", "Thống kê",
-                                 lambda: show_thongKe(window, user_role, buttons, buttons[0]), 1, 0))
-    buttons.append(create_button(menu_frame, "img/customer_light.png", "Khách hàng",
-                                 lambda: show_khachHang(window, user_role, buttons, buttons[1]), 2, 0))
-    buttons.append(create_button(menu_frame, "img/animal-shelter.png", "Phòng thú",
-                                 lambda: show_thuCungRoom(window, user_role, buttons, buttons[2]), 3, 0))
-    buttons.append(create_button(menu_frame, "img/pet_light.png", "Thú",
-                                 lambda: show_thuCung(window, user_role, buttons, buttons[3]), 4, 0))
-    buttons.append(create_button(menu_frame, "img/supply-chain_light.png", "Dịch vụ",
-                                 lambda: show_dichVu(window, user_role, buttons, buttons[4]), 5, 0))
-    buttons.append(create_button(menu_frame, "img/recipt_light.png", "Hóa đơn",
-                                 lambda: show_hoaDon(window, user_role, buttons, buttons[5]), 6, 0))
-    buttons.append(create_button(menu_frame, "img/work_light.png", "Nhân viên",
-                                 lambda: show_nhanVien(window, user_role, buttons, buttons[6]), 7, 0))
-
+    buttons = [create_button(menu_frame, "img/stats_light.png", "Thống kê",
+                             lambda: show_thongKe(window, user_role, buttons, buttons[0]), 1, 0),
+               create_button(menu_frame, "img/customer_light.png", "Khách hàng",
+                             lambda: show_khachHang(window, user_role, buttons, buttons[1]), 2, 0),
+               create_button(menu_frame, "img/animal-shelter.png", "Phòng thú",
+                             lambda: show_thuCungRoom(window, user_role, buttons, buttons[2]), 3, 0),
+               create_button(menu_frame, "img/pet_light.png", "Thú",
+                             lambda: show_thuCung(window, user_role, buttons, buttons[3]), 4, 0),
+               create_button(menu_frame, "img/supply-chain_light.png", "Dịch vụ",
+                             lambda: show_dichVu(window, user_role, buttons, buttons[4]), 5, 0),
+               create_button(menu_frame, "img/recipt_light.png", "Hóa đơn",
+                             lambda: show_hoaDon(window, user_role, buttons, buttons[5], emp_id), 6, 0),
+               create_button(menu_frame, "img/work_light.png", "Nhân viên",
+                             lambda: show_nhanVien(window, user_role, buttons, buttons[6]), 7, 0)]
 
     # Chạy giao diện chính
     window.mainloop()

@@ -41,8 +41,13 @@ def fetch_customer_data(table, search_query=None, search_column=None):
             table.delete(item)
 
         # Thêm dữ liệu mới vào bảng
-        for item in data:
-            table.insert('', tb.END, values=(f"KH{item[0]}", item[1], item[2], item[3], item[4], item[5]))
+        table.tag_configure('evenrow', background='#f2f2f2')
+        table.tag_configure('oddrow', background='#ffffff')
+        for i, item in enumerate(data):
+            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+            table.insert('', tb.END, values=(f"KH{item[0]}", item[1], item[2], item[3], item[4], item[5]), tags=(tag,))
+
+
 
     except mysql.connector.Error as e:  # Sử dụng ngoại lệ đúng
         messagebox.showerror("Lỗi", f"Không thể lấy dữ liệu khách hàng: {e}")
@@ -235,7 +240,18 @@ def show_khachHang(window, user_role, buttons, khachHang_btn):
         return
 
     clicked(khachHang_btn, buttons)
-
+    style = tb.Style()
+    style.configure("Custom.Treeview",
+                    borderwidth=1,
+                    relief="solid",  # Tạo viền quanh bảng
+                    rowheight=25,  # Điều chỉnh chiều cao hàng
+                    background="#fdfdfd",  # Màu nền
+                    foreground="#000")  # Màu chữ
+    style.configure("Custom.Treeview.Heading",
+                    background="#e1e1e1",  # Màu nền tiêu đề
+                    foreground="#000",  # Màu chữ tiêu đề
+                    borderwidth=1,
+                    relief="solid")  # Tạo viền cho tiêu đề
     # Tạo frame chính
     khachHang_frame = tb.Labelframe(window, bootstyle="secondary", text="Quản lý khách hàng")
     khachHang_frame.grid(row=0, column=1, columnspan=5, padx=5, pady=5, sticky="nsew")
@@ -258,7 +274,8 @@ def show_khachHang(window, user_role, buttons, khachHang_btn):
     tree_scroll.grid(row=0, rowspan=6, column=3, sticky="wnes", padx=5, pady=30)
 
     columns = ("cID", "cName", "cNumber", "cAddress", "cRegDate", "cNote")
-    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set)
+    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set,
+                        style="Custom.Treeview")
     tree_scroll.config(command=table.yview)
 
     table.heading("cID", text="ID")
@@ -300,7 +317,7 @@ def show_khachHang(window, user_role, buttons, khachHang_btn):
     search_column = tb.StringVar()
     search_dropdown = tb.Combobox(funcbar, textvariable=search_column, values=columns, width=14)
     search_dropdown.grid(row=0, column=3, padx=10, pady=10)
-    search_dropdown.set("Họ tên")  # Thuộc tính mặc định
+    search_dropdown.set("ID")  # Thuộc tính mặc định
 
     search_entry = tb.Entry(funcbar, width=20)
     search_entry.grid(row=0, column=4, padx=10, pady=10, sticky="e")

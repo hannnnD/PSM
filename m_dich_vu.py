@@ -4,201 +4,290 @@ from DB import cursor, db
 from utils import clicked
 
 
-def fetch_service_data(table, keyword=None):
-    """
-    Truy xuất dữ liệu dịch vụ từ database và hiển thị trong bảng.
+def show_dichVu(window, user_role, buttons, dichVu_btn):
+    if user_role not in ['admin', 'cashier']:
+        messagebox.showerror("Access Denied", "Bạn không có quyền truy cập vào tính năng này")
+        return
+    clicked(dichVu_btn, buttons)
+    style = tb.Style()
+    style.configure("Custom.Treeview",
+                    borderwidth=1,
+                    relief="solid",  # Tạo viền quanh bảng
+                    rowheight=25,  # Điều chỉnh chiều cao hàng
+                    background="#fdfdfd",  # Màu nền
+                    foreground="#000")  # Màu chữ
+    style.configure("Custom.Treeview.Heading",
+                    background="#e1e1e1",  # Màu nền tiêu đề
+                    foreground="#000",  # Màu chữ tiêu đề
+                    borderwidth=1,
+                    relief="solid")  # Tạo viền cho tiêu đề
+    dichVu_frame = tb.Labelframe(window, bootstyle="secondary", text="Quản lý Dịch vụ")
+    dichVu_frame.grid(row=0, column=1, columnspan=5, padx=5, pady=5, sticky="nsew")
+    dichVu_frame.columnconfigure(0, weight=1)
+    dichVu_frame.rowconfigure(0, weight=1)
+    dichVu_frame.rowconfigure((1, 2, 3, 4, 5, 6), weight=15)
 
-    Args:
-        table: Bảng Treeview để hiển thị dữ liệu.
-        keyword: Từ khóa tìm kiếm.
-    """
-    query = "SELECT ServiceID, SName, SCategories, SQuantity, SPrice, SNotes FROM ServiceTbl"
-    params = ()
-    if keyword:
-        query += " WHERE ServiceID LIKE %s OR SName LIKE %s"
-        params = (f"%{keyword}%", f"%{keyword}%")
+    header_frame = tb.Frame(dichVu_frame, height=60)
+    header_frame.grid(row=0, column=0, columnspan=2, sticky="new")
 
-    try:
-        cursor.execute(query, params)
-        data = cursor.fetchall()
+    content_frame = tb.Frame(dichVu_frame)
+    content_frame.grid(row=0, column=0, columnspan=2, rowspan=7, sticky="news")
+    content_frame.columnconfigure((0, 1), weight=50)
+    content_frame.columnconfigure(3, weight=1)
+    content_frame.rowconfigure((0, 1, 2, 3, 4, 5), weight=1)
 
-        # Xóa dữ liệu cũ trong bảng
+    tree_scroll = tb.Scrollbar(content_frame, orient="vertical", bootstyle="primary-round")
+    tree_scroll.grid(row=0, rowspan=6, column=3, sticky="wnes", padx=5, pady=30)
+
+    columns = ("ServiceID", "SName", "SCategories", "SQuantity", "SPrice", "SNotes")
+    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set,
+                        style="Custom.Treeview")
+    tree_scroll.config(command=table.yview)
+
+    table.heading("ServiceID", text="Service ID")
+    table.heading("SName", text="Tên dịch vụ")
+    table.heading("SCategories", text="Danh mục")
+    table.heading("SQuantity", text="Số lượng")
+    table.heading("SPrice", text="Giá")
+    table.heading("SNotes", text="Ghi chú")
+
+    table.column("ServiceID", width=30, anchor="center")
+    table.column("SName", width=150, anchor="center")
+    table.column("SCategories", width=80, anchor="center")
+    table.column("SQuantity", width=70, anchor="center")
+    table.column("SPrice", width=50, anchor="center")
+    table.column("SNotes", width=150, anchor="center")
+
+    table.grid(row=0, column=0, padx=10, pady=10, rowspan=6, columnspan=2, sticky="news")
+
+    funcbar = tb.Frame(content_frame, height=60)
+    funcbar.grid(row=6, column=0, columnspan=3, sticky="news")
+    funcbar.columnconfigure((0, 1, 2, 3, 5), weight=1)
+    funcbar.columnconfigure(4, weight=30)
+
+    def fetch_and_insert_data():
+        cursor.execute("SELECT ServiceID, SName, SCategories, SQuantity, SPrice, SNotes FROM ServiceTbl")
         for item in table.get_children():
             table.delete(item)
+        data = cursor.fetchall()
 
-        # Thêm dữ liệu mới vào bảng
-        for item in data:
-            table.insert("", tb.END, values=item)
-    except db.Error as e:
-        messagebox.showerror("Lỗi", f"Không thể lấy dữ liệu dịch vụ: {e}")
+        def format_vnd(amount):
+            return f"{amount:,.0f}".replace(',', '.') + " VND"
 
+        table.tag_configure('evenrow', background='#f2f2f2')
+        table.tag_configure('oddrow', background='#ffffff')
+        for i, item in enumerate(data):
+            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+            formatted_total = format_vnd(item[4])
+            table.insert('', tb.END, values=(item[0], item[1], item[2], item[3], formatted_total, item[5]), tags=(tag,))
 
-def add_service(table):
-    """
-    Hiển thị giao diện thêm dịch vụ.
-    """
-    add_window = tb.Toplevel(title="Thêm dịch vụ", minsize=(380, 520))
-    lf = tb.Labelframe(add_window, bootstyle="secondary", text="Thông tin dịch vụ")
-    lf.pack(fill="both", padx=5, pady=5, expand=True)
+    fetch_and_insert_data()
 
-    lf.columnconfigure((0, 1), weight=1)
-    lf.columnconfigure(2, weight=30)
-    lf.rowconfigure((0, 1, 2, 3, 4, 5, 6), weight=1)
+    def themDichVu():
+        addwindow = tb.Toplevel(title="Thêm dịch vụ", minsize=(380, 520))
+        lf = tb.Labelframe(addwindow, bootstyle="secondary", text="")
+        lf.pack(fill="both", padx=5, pady=5, expand=True, anchor="w")
+        lf.columnconfigure((0, 1), weight=1)
+        lf.columnconfigure(2, weight=30)
+        lf.rowconfigure((0, 1, 2, 3, 4, 5, 6, 7), weight=1)
 
-    # ID tự động
-    tb.Label(lf, text="Service ID").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-    id_entry = tb.Entry(lf, width=16)
-    id_entry.grid(row=0, column=2, padx=10, pady=5, sticky="e")
-    cursor.execute("SELECT MAX(ServiceID) FROM ServiceTbl")
-    result = cursor.fetchone()
-    new_id = result[0] + 1 if result and result[0] is not None else 1
-    id_entry.insert(0, new_id)
-    id_entry.configure(state="readonly")
+        id_lb = tb.Label(lf, bootstyle="secondary", text="Service ID")
+        id_lb.grid(row=0, column=0, padx=10, pady=5, sticky="new")
+        id_entry = tb.Entry(lf, width=16)
+        id_entry.grid(row=0, column=2, padx=10, pady=5, sticky="new")
+        cursor.execute("Select MAX(ServiceID) FROM ServiceTbl")
+        result = cursor.fetchone()
+        sID = result[0] + 1 if result and result[0] is not None else "No ID"
+        id_entry.insert(0, sID)
 
-    # Các trường khác
-    fields = ["Tên dịch vụ", "Danh mục", "Số lượng", "Giá", "Ghi chú"]
-    entries = {}
-    for i, field in enumerate(fields, start=1):
-        tb.Label(lf, text=field).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-        entry = tb.Entry(lf, width=16)
-        entry.grid(row=i, column=2, padx=10, pady=5, sticky="e")
-        entries[field] = entry
+        name_lb = tb.Label(lf, bootstyle="secondary", text="Tên dịch vụ")
+        name_lb.grid(row=1, column=0, padx=10, pady=5, sticky="new")
+        name_entry = tb.Entry(lf, width=16)
+        name_entry.grid(row=1, column=2, padx=10, pady=5, sticky="new")
 
-    # Nút lưu
-    def save_new_service():
-        values = {field: entry.get() for field, entry in entries.items()}
-        if any(not value for value in values.values()):
-            messagebox.showerror("Lỗi", "Vui lòng nhập đầy đủ thông tin dịch vụ.")
+        categories_lb = tb.Label(lf, bootstyle="secondary", text="Danh mục")
+        categories_lb.grid(row=2, column=0, padx=10, pady=5, sticky="new")
+        categories_entry = tb.Entry(lf, width=16)
+        categories_entry.grid(row=2, column=2, padx=10, pady=5, sticky="new")
+
+        quantity_lb = tb.Label(lf, bootstyle="secondary", text="Số lượng")
+        quantity_lb.grid(row=3, column=0, padx=10, pady=5, sticky="new")
+        quantity_entry = tb.Entry(lf, width=16)
+        quantity_entry.grid(row=3, column=2, padx=10, pady=5, sticky="new")
+
+        price_lb = tb.Label(lf, bootstyle="secondary", text="Giá")
+        price_lb.grid(row=4, column=0, padx=10, pady=5, sticky="new")
+        price_entry = tb.Entry(lf, width=16)
+        price_entry.grid(row=4, column=2, padx=10, pady=5, sticky="new")
+
+        notes_lb = tb.Label(lf, bootstyle="secondary", text="Ghi chú")
+        notes_lb.grid(row=5, column=0, padx=10, pady=5, sticky="new")
+        notes_entry = tb.Entry(lf, width=16)
+        notes_entry.grid(row=5, column=2, padx=10, pady=5, sticky="new")
+
+        def add_sql():
+            id = id_entry.get()
+            name = name_entry.get()
+            categories = categories_entry.get()
+            quantity = quantity_entry.get()
+            price = price_entry.get()
+            notes = notes_entry.get()
+
+            if not id or not name or not categories or not quantity or not price:
+                messagebox.showerror("Lỗi", "Vui lòng nhập đầy đủ thông tin dịch vụ.")
+                return
+            try:
+                cursor.execute(
+                    "INSERT INTO ServiceTbl (ServiceID, SName, SCategories, SQuantity, SPrice, SNotes) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (id, name, categories, quantity, price, notes)
+                )
+                db.commit()
+
+                fetch_and_insert_data()
+
+                messagebox.showinfo("Thành công", "Thông tin đã được thêm thành công!")
+                addwindow.destroy()
+
+            except ValueError:
+                messagebox.showerror("Lỗi", "Vui lòng nhập giá trị hợp lệ!")
+            except db.Error as e:
+                messagebox.showerror("Lỗi", f"Không thể thêm dịch vụ: {e}")
+
+        them = tb.Button(addwindow, bootstyle="success", text="Thêm", command=add_sql)
+        them.pack(side=tb.LEFT, fill="x", padx=10, pady=10, expand=True, anchor="w")
+
+    def suaDichVu():
+        selected_item = table.focus()
+        if not selected_item:
+            messagebox.showerror("Lỗi", "Vui lòng chọn dịch vụ để sửa.")
             return
 
-        try:
-            cursor.execute(
-                "INSERT INTO ServiceTbl (ServiceID, SName, SCategories, SQuantity, SPrice, SNotes) "
-                "VALUES (%s, %s, %s, %s, %s, %s)",
-                (new_id, values["Tên dịch vụ"], values["Danh mục"], values["Số lượng"], values["Giá"], values["Ghi chú"]),
-            )
-            db.commit()
-            fetch_service_data(table)
-            messagebox.showinfo("Thành công", "Dịch vụ đã được thêm thành công!")
-            add_window.destroy()
-        except db.Error as e:
-            messagebox.showerror("Lỗi", f"Không thể thêm dịch vụ: {e}")
+        ID = table.item(selected_item, 'values')[0]
 
-    tb.Button(add_window, text="Thêm", bootstyle="success", command=save_new_service).pack(
-        fill="x", padx=10, pady=10
-    )
+        cursor.execute("SELECT * FROM ServiceTbl WHERE ServiceID=%s", (ID,))
+        item_data = cursor.fetchone()
 
+        editwindow = tb.Toplevel(title="Sửa dịch vụ", minsize=(380, 520))
+        lf = tb.Labelframe(editwindow, bootstyle="secondary", text="")
+        lf.pack(fill="both", padx=5, pady=5, expand=True, anchor="w")
+        lf.columnconfigure((0, 1), weight=1)
+        lf.columnconfigure(2, weight=30)
+        lf.rowconfigure((0, 1, 2, 3, 4, 5, 6, 7), weight=1)
 
-def edit_service(table):
-    """
-    Hiển thị giao diện sửa dịch vụ đã chọn.
-    """
-    selected_item = table.focus()
-    if not selected_item:
-        messagebox.showerror("Lỗi", "Vui lòng chọn dịch vụ để sửa.")
-        return
+        id_lb = tb.Label(lf, bootstyle="secondary", text="Service ID")
+        id_lb.grid(row=0, column=0, padx=10, pady=5, sticky="new")
+        id_entry = tb.Entry(lf, width=16)
+        id_entry.grid(row=0, column=2, padx=10, pady=5, sticky="new")
 
-    service_data = table.item(selected_item, "values")
-    edit_window = tb.Toplevel(title="Sửa dịch vụ", minsize=(380, 520))
-    lf = tb.Labelframe(edit_window, bootstyle="secondary", text="Thông tin dịch vụ")
-    lf.pack(fill="both", padx=5, pady=5, expand=True)
+        name_lb = tb.Label(lf, bootstyle="secondary", text="Tên dịch vụ")
+        name_lb.grid(row=1, column=0, padx=10, pady=5, sticky="new")
+        name_entry = tb.Entry(lf, width=16)
+        name_entry.grid(row=1, column=2, padx=10, pady=5, sticky="new")
 
-    lf.columnconfigure((0, 1), weight=1)
-    lf.columnconfigure(2, weight=30)
-    lf.rowconfigure((0, 1, 2, 3, 4, 5, 6), weight=1)
+        categories_lb = tb.Label(lf, bootstyle="secondary", text="Danh mục")
+        categories_lb.grid(row=2, column=0, padx=10, pady=5, sticky="new")
+        categories_entry = tb.Entry(lf, width=16)
+        categories_entry.grid(row=2, column=2, padx=10, pady=5, sticky="new")
 
-    # ID không sửa
-    tb.Label(lf, text="Service ID").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-    id_entry = tb.Entry(lf, width=16)
-    id_entry.grid(row=0, column=2, padx=10, pady=5, sticky="e")
-    id_entry.insert(0, service_data[0])
-    id_entry.configure(state="readonly")
+        quantity_lb = tb.Label(lf, bootstyle="secondary", text="Số lượng")
+        quantity_lb.grid(row=3, column=0, padx=10, pady=5, sticky="new")
+        quantity_entry = tb.Entry(lf, width=16)
+        quantity_entry.grid(row=3, column=2, padx=10, pady=5, sticky="new")
 
-    # Các trường khác
-    fields = ["Tên dịch vụ", "Danh mục", "Số lượng", "Giá", "Ghi chú"]
-    entries = {}
-    for i, field in enumerate(fields, start=1):
-        tb.Label(lf, text=field).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-        entry = tb.Entry(lf, width=16)
-        entry.insert(0, service_data[i])
-        entry.grid(row=i, column=2, padx=10, pady=5, sticky="e")
-        entries[field] = entry
+        price_lb = tb.Label(lf, bootstyle="secondary", text="Giá")
+        price_lb.grid(row=4, column=0, padx=10, pady=5, sticky="new")
+        price_entry = tb.Entry(lf, width=16)
+        price_entry.grid(row=4, column=2, padx=10, pady=5, sticky="new")
 
-    # Nút lưu
-    def save_changes():
-        values = {field: entry.get() for field, entry in entries.items()}
-        if any(not value for value in values.values()):
-            messagebox.showerror("Lỗi", "Vui lòng nhập đầy đủ thông tin.")
+        notes_lb = tb.Label(lf, bootstyle="secondary", text="Ghi chú")
+        notes_lb.grid(row=5, column=0, padx=10, pady=5, sticky="new")
+        notes_entry = tb.Entry(lf, width=16)
+        notes_entry.grid(row=5, column=2, padx=10, pady=5, sticky="new")
+
+        id_entry.insert(0, item_data[0])
+        name_entry.insert(0, item_data[1])
+        categories_entry.insert(0, item_data[2])
+        quantity_entry.insert(0, item_data[3])
+        price_entry.insert(0, item_data[4])
+        notes_entry.insert(0, item_data[5])
+
+        def update_sql():
+            id = id_entry.get()
+            name = name_entry.get()
+            categories = categories_entry.get()
+            quantity = quantity_entry.get()
+            price = price_entry.get()
+            notes = notes_entry.get()
+
+            if not id or not name or not categories or not quantity or not price:
+                messagebox.showerror("Lỗi", "Vui lòng nhập đầy đủ thông tin dịch vụ.")
+                return
+            try:
+                cursor.execute(
+                    "UPDATE ServiceTbl SET SName=%s, SCategories=%s, SQuantity=%s, SPrice=%s, SNotes=%s WHERE ServiceID=%s",
+                    (name, categories, quantity, price, notes, id)
+                )
+                db.commit()
+
+                fetch_and_insert_data()
+
+                messagebox.showinfo("Thành công", "Thông tin đã được cập nhật thành công!")
+                editwindow.destroy()
+
+            except ValueError:
+                messagebox.showerror("Lỗi", "Vui lòng nhập giá trị hợp lệ!")
+            except db.Error as e:
+                messagebox.showerror("Lỗi", f"Không thể cập nhật dịch vụ: {e}")
+
+        sua = tb.Button(editwindow, bootstyle="success", text="Sửa", command=update_sql)
+        sua.pack(side=tb.LEFT, fill="x", padx=10, pady=10, expand=True, anchor="w")
+
+    def xoaDichVu():
+        selected_item = table.focus()
+        if not selected_item:
+            messagebox.showerror("Lỗi", "Vui lòng chọn dịch vụ để xóa.")
             return
 
-        try:
-            cursor.execute(
-                "UPDATE ServiceTbl SET SName=%s, SCategories=%s, SQuantity=%s, SPrice=%s, SNotes=%s WHERE ServiceID=%s",
-                (values["Tên dịch vụ"], values["Danh mục"], values["Số lượng"], values["Giá"], values["Ghi chú"], service_data[0]),
-            )
-            db.commit()
-            fetch_service_data(table)
-            messagebox.showinfo("Thành công", "Dịch vụ đã được cập nhật!")
-            edit_window.destroy()
-        except db.Error as e:
-            messagebox.showerror("Lỗi", f"Không thể cập nhật dịch vụ: {e}")
+        ID = table.item(selected_item, 'values')[0]
 
-    tb.Button(edit_window, text="Lưu", bootstyle="success", command=save_changes).pack(
-        fill="x", padx=10, pady=10
-    )
+        confirm = messagebox.askyesno("Xác nhận", f"Bạn có chắc chắn muốn xóa dịch vụ có ID {ID} không?")
+        if confirm:
+            try:
+                cursor.execute("DELETE FROM ServiceTbl WHERE ServiceID=%s", (ID,))
+                db.commit()
 
+                fetch_and_insert_data()
 
-def delete_service(table):
-    """
-    Xóa dịch vụ đã chọn.
-    """
-    selected_item = table.focus()
-    if not selected_item:
-        messagebox.showerror("Lỗi", "Vui lòng chọn dịch vụ để xóa.")
-        return
+                messagebox.showinfo("Thành công", "Dịch vụ đã được xóa thành công!")
+            except db.Error as e:
+                messagebox.showerror("Lỗi", f"Không thể xóa dịch vụ: {e}")
 
-    service_id = table.item(selected_item, "values")[0]
-    confirm = messagebox.askyesno("Xác nhận", f"Bạn có chắc chắn muốn xóa dịch vụ ID {service_id}?")
-    if confirm:
-        try:
-            cursor.execute("DELETE FROM ServiceTbl WHERE ServiceID=%s", (service_id,))
-            db.commit()
-            fetch_service_data(table)
-            messagebox.showinfo("Thành công", "Dịch vụ đã được xóa.")
-        except db.Error as e:
-            messagebox.showerror("Lỗi", f"Không thể xóa dịch vụ: {e}")
+    btn_them = tb.Button(funcbar, bootstyle="success-outline", text="Thêm", command=themDichVu)
+    btn_them.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
+    btn_sua = tb.Button(funcbar, bootstyle="success-outline", text="Sửa", command=suaDichVu)
+    btn_sua.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
-def show_dichVu(window, user_role, buttons, dichVu_btn):
-    """
-    Hiển thị giao diện quản lý dịch vụ.
-    """
-    if user_role not in ["admin", "cashier"]:
-        messagebox.showerror("Access Denied", "Bạn không có quyền truy cập vào tính năng này.")
-        return
+    btn_xoa = tb.Button(funcbar, bootstyle="danger-outline", text="Xóa", command=xoaDichVu)
+    btn_xoa.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
 
-    clicked(dichVu_btn, buttons)
-
-    # Tạo frame chính
-    dichVu_frame = tb.Labelframe(window, bootstyle="secondary", text="Quản lý dịch vụ")
-    dichVu_frame.grid(row=0, column=1, columnspan=5, padx=5, pady=5, sticky="nsew")
-
-    # Tạo bảng hiển thị
-    columns = ("ServiceID", "SName", "SCategories", "SQuantity", "SPrice", "SNotes")
-    table = tb.Treeview(dichVu_frame, columns=columns, show="headings")
-    for col in columns:
-        table.heading(col, text=col)
-    table.grid(row=0, column=0, padx=10, pady=10, sticky="news")
-    fetch_service_data(table)
-
-    # Thanh chức năng
-    funcbar = tb.Frame(dichVu_frame, height=60)
-    funcbar.grid(row=1, column=0, sticky="new")
-
-    tb.Button(funcbar, text="Thêm", command=lambda: add_service(table)).pack(side="left", padx=5)
-    tb.Button(funcbar, text="Sửa", command=lambda: edit_service(table)).pack(side="left", padx=5)
-    tb.Button(funcbar, text="Xóa", command=lambda: delete_service(table)).pack(side="left", padx=5)
+    btn_refresh = tb.Button(funcbar, bootstyle="secondary-outline", text="Làm mới", command=fetch_and_insert_data)
+    btn_refresh.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
     search_entry = tb.Entry(funcbar)
-    search_entry.pack(side="left", padx=5)
-    tb.Button(funcbar, text="Tìm kiếm", command=lambda: fetch_service_data(table, search_entry.get())).pack(side="left", padx=5)
+    search_entry.grid(row=0, column=4, padx=10, pady=10, sticky="ew")
+
+    def timkiemDichVu():
+        keyword = search_entry.get()
+        cursor.execute(
+            "SELECT ServiceID, SName, SCategories, SQuantity, SPrice, SNotes FROM ServiceTbl WHERE ServiceID LIKE %s OR SName LIKE %s",
+            (f'%{keyword}%', f'%{keyword}%')
+        )
+        for item in table.get_children():
+            table.delete(item)
+        data = cursor.fetchall()
+        for item in data:
+            table.insert('', tb.END, values=(item[0], item[1], item[2], item[3], item[4], item[5]))
+
+    btn_tim = tb.Button(funcbar, bootstyle="info-outline", text="Tìm", command=timkiemDichVu)
+    btn_tim.grid(row=0, column=5, padx=10, pady=10, sticky="ew")

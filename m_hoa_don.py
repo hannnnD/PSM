@@ -1,11 +1,22 @@
+import subprocess
 import tkinter as tk
 from tkinter import messagebox
 import ttkbootstrap as tb
+
 from DB import cursor, db
 from utils import clicked
 from datetime import datetime, timedelta, date
+import os
 
-def show_hoaDon(window, user_role, buttons, hoaDon_btn):
+import tempfile
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.platypus import Table, TableStyle
+from reportlab.lib import colors
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+
+def show_hoaDon(window, user_role, buttons, hoaDon_btn, emp_id):
     """
     Hiển thị giao diện quản lý hóa đơn.
 
@@ -20,7 +31,18 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
         return
 
     clicked(hoaDon_btn, buttons)
-
+    style = tb.Style()
+    style.configure("Custom.Treeview",
+                    borderwidth=1,
+                    relief="solid",  # Tạo viền quanh bảng
+                    rowheight=25,  # Điều chỉnh chiều cao hàng
+                    background="#fdfdfd",  # Màu nền
+                    foreground="#000")  # Màu chữ
+    style.configure("Custom.Treeview.Heading",
+                    background="#e1e1e1",  # Màu nền tiêu đề
+                    foreground="#000",  # Màu chữ tiêu đề
+                    borderwidth=1,
+                    relief="solid")  # Tạo viền cho tiêu đề
     invoice_frame = tb.Labelframe(window, bootstyle="secondary", text="Quản lý Hóa đơn")
     invoice_frame.grid(row=0, column=1, columnspan=5, padx=5, pady=5, sticky="nsew")
     invoice_frame.columnconfigure(0, weight=1)
@@ -40,7 +62,11 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
     tree_scroll.grid(row=0, rowspan=6, column=3, sticky="wnes", padx=5, pady=30)
 
     columns = ("InvoiceID", "InvoiceDate", "CustName", "EmpName", "TotalAmt")
-    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set)
+    # Áp dụng kiểu tùy chỉnh cho Treeview
+    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set,
+                        style="Custom.Treeview")
+
+
     tree_scroll.config(command=table.yview)
 
     table.heading("InvoiceID", text="Mã Hóa Đơn")
@@ -64,25 +90,34 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
 
     def fetch_and_insert_data():
         query = """
-                SELECT InvoiceTbl.InvoiceID, InvoiceTbl.InvoiceDate, CustomerTbl.CustName, 
-                       EmployeeTbl.EmpName, 
-                       SUM(COALESCE(InvoiceDetailTbl.TotalAmt, 0) + COALESCE(PetCareInvoiceDetailTbl.TotalAmt, 0)) as TotalAmt
-                FROM InvoiceTbl
-                LEFT JOIN CustomerTbl ON InvoiceTbl.CustID = CustomerTbl.CustID
-                LEFT JOIN EmployeeTbl ON InvoiceTbl.EmpID = EmployeeTbl.EmpID
-                LEFT JOIN InvoiceDetailTbl ON InvoiceTbl.InvoiceID = InvoiceDetailTbl.InvoiceID
-                LEFT JOIN PetCareInvoiceDetailTbl ON InvoiceTbl.InvoiceID = PetCareInvoiceDetailTbl.InvoiceID
-                GROUP BY InvoiceTbl.InvoiceID, InvoiceTbl.InvoiceDate, CustomerTbl.CustName, 
-                         EmployeeTbl.EmpName
-                """
+            SELECT InvoiceTbl.InvoiceID, InvoiceTbl.InvoiceDate, CustomerTbl.CustName, 
+                   EmployeeTbl.EmpName, 
+                   SUM(COALESCE(InvoiceDetailTbl.TotalAmt, 0)) as TotalAmt
+            FROM InvoiceTbl
+            LEFT JOIN CustomerTbl ON InvoiceTbl.CustID = CustomerTbl.CustID
+            LEFT JOIN EmployeeTbl ON InvoiceTbl.EmpID = EmployeeTbl.EmpID
+            LEFT JOIN InvoiceDetailTbl ON InvoiceTbl.InvoiceID = InvoiceDetailTbl.InvoiceID
+            GROUP BY InvoiceTbl.InvoiceID, InvoiceTbl.InvoiceDate, CustomerTbl.CustName, 
+                     EmployeeTbl.EmpName
+            """
+
         cursor.execute(query)
         for item in table.get_children():
             table.delete(item)
         data = cursor.fetchall()
-        for item in data:
-            table.insert('', tb.END, values=(item[0], item[1], item[2], item[3], item[4]))
+
+        def format_vnd(amount):
+            return f"{amount:,.0f}".replace(',', '.') + " VND"
+
+        table.tag_configure('evenrow', background='#f2f2f2')
+        table.tag_configure('oddrow', background='#ffffff')
+        for i, item in enumerate(data):
+            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+            formatted_total = format_vnd(item[4])
+            table.insert('', tb.END, values=(item[0], item[1], item[2], item[3], formatted_total), tags=(tag,))
 
     fetch_and_insert_data()
+
 
     def add_invoice():
         def load_customer_data():
@@ -135,6 +170,8 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
             service_name_entry.config(state="readonly")
             service_price_entry.config(state="readonly")
 
+        total_prices = []  # Khởi tạo một danh sách để lưu total_price cho mỗi dịch vụ
+
         def add_to_bill():
             try:
                 service_id = service_id_entry.get()
@@ -145,12 +182,16 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
                 if not service_qty or service_qty <= 0:
                     raise ValueError("Invalid quantity")
 
-                total_price = service_qty * service_price
+                # Tính toán tổng tiền
+                total_price = service_price * service_qty
 
-                # Add to bill tree
+                # Thêm vào hóa đơn
                 bill_tree.insert("", "end", values=(service_id, service_name, service_qty, total_price))
 
-                # Update total bill
+                # Lưu total_price vào danh sách
+                total_prices.append(total_price)
+
+                # Cập nhật tổng hóa đơn
                 current_total = float(total_var.get())
                 new_total = current_total + total_price
                 total_var.set(str(new_total))
@@ -177,130 +218,151 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
 
         def save_invoice(emp_id):
             try:
+                # Lấy các thông tin từ giao diện
                 invoice_id_val = invoice_id.get()
                 invoice_date_val = invoice_date.entry.get()
                 cust_id_val = cust_id_entry.get()
-                total_amount = total_var.get()
 
+                # Lưu thông tin vào bảng hóa đơn chính (InvoiceTbl)
                 cursor.execute(
                     "INSERT INTO InvoiceTbl (InvoiceID, InvoiceDate, CustID, EmpID) VALUES (%s, %s, %s, %s)",
                     (invoice_id_val, invoice_date_val, cust_id_val, emp_id)
                 )
 
-                for item in bill_tree.get_children():
+                # Lặp qua từng dịch vụ trong hóa đơn từ giao diện
+                for idx, item in enumerate(bill_tree.get_children()):
                     values = bill_tree.item(item, "values")
-                    service_id_val = values[0]
-                    service_qty_val = values[2]
-                    service_price_val = values[3]
+                    service_id_val = values[0]  # Lấy ServiceID
+                    service_name_val = values[1]  # Lấy tên dịch vụ
+                    service_qty_val = int(values[2])  # Lấy số lượng (SQuantity)
+                    total_service_amount = float(values[3])  # Lấy tổng tiền (TotalAmt)
 
+                    # Lấy giá dịch vụ (SPrice) từ cơ sở dữ liệu để đảm bảo tính chính xác
+                    cursor.execute("SELECT SPrice FROM ServiceTbl WHERE ServiceID = %s", (service_id_val,))
+                    service_price_val = cursor.fetchone()[0]
+
+                    # Kiểm tra tồn kho trước khi cập nhật
+                    cursor.execute("SELECT SQuantity FROM ServiceTbl WHERE ServiceID = %s", (service_id_val,))
+                    available_qty = cursor.fetchone()[0]
+                    if available_qty < service_qty_val:
+                        raise ValueError(f"Không đủ số lượng dịch vụ {service_name_val}. Số còn lại: {available_qty}")
+
+                    # Lưu chi tiết hóa đơn vào bảng InvoiceDetailTbl
                     cursor.execute(
-                        "INSERT INTO InvoiceDetailTbl (InvoiceID, ServiceID, SQuantity, SPrice, TotalAmt, idDate) VALUES (%s, %s, %s, %s, %s, %s)",
-                        (invoice_id_val, service_id_val, service_qty_val, service_price_val, total_amount,
+                        """
+                        INSERT INTO InvoiceDetailTbl (InvoiceID, ServiceID, SQuantity, SPrice, TotalAmt, idDate) 
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (invoice_id_val, service_id_val, service_qty_val, service_price_val, total_service_amount,
                          invoice_date_val)
                     )
 
+                    # Cập nhật số lượng tồn kho trong bảng ServiceTbl
                     cursor.execute(
                         "UPDATE ServiceTbl SET SQuantity = SQuantity - %s WHERE ServiceID = %s",
                         (service_qty_val, service_id_val)
                     )
 
+                # Xác nhận lưu tất cả thay đổi vào cơ sở dữ liệu
                 db.commit()
+
+                # Thông báo khi lưu thành công
                 messagebox.showinfo("Success", "Invoice saved successfully")
 
+            except ValueError as ve:
+                messagebox.showerror("Error", str(ve))
+                db.rollback()
             except Exception as e:
+                # Xử lý lỗi và rollback khi gặp lỗi
                 messagebox.showerror("Error", str(e))
                 db.rollback()
 
-        def show_invoice_preview():
-            # Hàm để định dạng số tiền
-            def format_currency(amount):
-                return "{:,.0f} ₫".format(amount).replace(",", ".")
+        pdfmetrics.registerFont(TTFont("DejaVuSans", "DejaVuSans.ttf"))
 
-            # Tạo cửa sổ mới để hiển thị thông tin hóa đơn
-            preview_window = tb.Toplevel(title="Xem trước hóa đơn", minsize=(600, 800))
-            preview_window.geometry("600x800")
+        def print_invoice():
+            try:
+                # Định dạng số tiền
+                def format_currency(amount):
+                    return f"{amount:,.0f}".replace(',', '.') + " VND"
 
-            # Frame chính chứa toàn bộ nội dung hóa đơn
-            main_frame = tb.Frame(preview_window, bootstyle="secondary")
-            main_frame.pack(fill="both", padx=10, pady=10, expand=True)
+                # Tạo file PDF tạm thời
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+                pdf_file_path = temp_file.name
+                temp_file.close()
 
-            # Tiêu đề hóa đơn
-            invoice_title_frame = tb.Frame(main_frame)
-            invoice_title_frame.pack(fill="x", pady=10)
-            tb.Label(invoice_title_frame, text="INVOICE", font=("Arial", 24, "bold")).pack()
+                # Tạo PDF
+                c = canvas.Canvas(pdf_file_path, pagesize=letter)
+                c.setFont("DejaVuSans", 16)
+                c.drawCentredString(300, 750, "HÓA ĐƠN DỊCH VỤ")  # Tiêu đề trung tâm
 
-            # Thông tin nhân viên và mã hóa đơn
-            emp_invoice_info_frame = tb.Frame(main_frame)
-            emp_invoice_info_frame.pack(fill="x", pady=10)
+                # Thông tin hóa đơn
+                c.setFont("DejaVuSans", 12)
+                c.drawString(50, 700, f"Nhân viên: {emp_id}")
+                c.drawString(50, 680, f"Mã hóa đơn: {invoice_id.get()}")
+                c.drawString(400, 680, f"Ngày: {invoice_date.entry.get()}")
 
-            tb.Label(emp_invoice_info_frame, text="NHÂN VIÊN:", font=("Arial", 12)).grid(row=0, column=0,
-                                                                                         sticky="w")
-            tb.Label(emp_invoice_info_frame, text=emp_id, font=("Arial", 12, "bold")).grid(row=0, column=1,
-                                                                                           sticky="w", padx=10)
-            tb.Label(emp_invoice_info_frame, text="MÃ HÓA ĐƠN:", font=("Arial", 12)).grid(row=0, column=2,
-                                                                                          sticky="e", padx=(20, 0))
-            tb.Label(emp_invoice_info_frame, text=invoice_id.get(), font=("Arial", 12, "bold")).grid(row=0,
-                                                                                                     column=3,
-                                                                                                     sticky="e",
-                                                                                                     padx=10)
-            tb.Label(emp_invoice_info_frame, text="DATE:", font=("Arial", 12)).grid(row=1, column=2, sticky="e",
-                                                                                    padx=(20, 0), pady=5)
-            tb.Label(emp_invoice_info_frame, text=invoice_date.entry.get(), font=("Arial", 12, "bold")).grid(row=1,
-                                                                                                             column=3,
-                                                                                                             sticky="e",
-                                                                                                             padx=10,
-                                                                                                             pady=5)
+                # Header bảng dịch vụ
+                y = 640
+                table_data = [["STT", "Tên dịch vụ", "SL", "Đơn giá", "Thành tiền"]]
+                total_amount = 0
 
-            # Danh sách dịch vụ
-            service_frame = tb.Frame(main_frame)
-            service_frame.pack(fill="both", pady=10, expand=True)
+                # Thêm dữ liệu từ TreeView
+                for index, item in enumerate(bill_tree.get_children(), start=1):
+                    values = bill_tree.item(item, "values")
+                    service_name = values[1]
+                    quantity = int(values[2])
+                    price = float(values[3])
+                    total = quantity * price
+                    total_amount += total
 
-            service_columns = ("sl", "service_name", "price", "quantity", "total")
-            service_tree_preview = tb.Treeview(service_frame, columns=service_columns, show="headings")
+                    table_data.append([
+                        str(index),
+                        service_name,
+                        str(quantity),
+                        format_currency(price),
+                        format_currency(total),
+                    ])
 
-            # Setting headings and column properties explicitly
-            service_tree_preview.heading("sl", text="SL.")
-            service_tree_preview.heading("service_name", text="TÊN DỊCH VỤ")
-            service_tree_preview.heading("price", text="PRICE")
-            service_tree_preview.heading("quantity", text="QTY.")
-            service_tree_preview.heading("total", text="TOTAL")
+                # Tổng hóa đơn
+                formatted_total_amount = format_currency(total_amount)
+                table_data.append(["", "", "", "Tổng cộng:", formatted_total_amount])
 
-            service_tree_preview.column("sl", width=50, anchor="center")
-            service_tree_preview.column("service_name", width=250, anchor="center")
-            service_tree_preview.column("price", width=100, anchor="center")
-            service_tree_preview.column("quantity", width=50, anchor="center")
-            service_tree_preview.column("total", width=100, anchor="center")
+                # Tạo bảng
+                table = Table(table_data, colWidths=[50, 200, 50, 100, 100])
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),  # Nền header
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSans'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Kẻ ô
+                ]))
+                table.wrapOn(c, 50, y)
+                table.drawOn(c, 50, y - len(table_data) * 20)
 
-            service_tree_preview.pack(fill="both", expand=True)
+                # Lời cảm ơn
+                c.setFont("DejaVuSans", 12)
+                c.drawCentredString(300, y - len(table_data) * 20 - 40,
+                                    "Cảm ơn quý khách đã sử dụng dịch vụ của chúng tôi!")
 
-            # Thêm dữ liệu từ bill_tree vào service_tree_preview
-            total_amount = 0
-            for index, item in enumerate(bill_tree.get_children(), start=1):
-                values = bill_tree.item(item, "values")
-                service_name = values[1]
-                quantity = int(float(values[2]))  # Chuyển đổi thành số nguyên nếu cần
-                price = float(values[3])
-                total = quantity * price
-                total_amount += total
-                formatted_price = format_currency(price)
-                formatted_total = format_currency(total)
-                service_tree_preview.insert("", "end", values=(
-                    index, service_name, formatted_price, quantity, formatted_total))
+                c.save()
 
-            # Tổng hóa đơn
-            total_frame = tb.Frame(main_frame)
-            total_frame.pack(fill="x", pady=10)
+                try:
+                    os.startfile(pdf_file_path, "print")  # Mở với ứng dụng mặc định để in
+                except OSError:
+                    # Nếu không có ứng dụng mặc định, dùng subprocess
+                    try:
+                        subprocess.run(["AcroRd32.exe", "/p", "/h", pdf_file_path], check=True)
+                    except FileNotFoundError:
+                        messagebox.showerror("Error",
+                                             "Không tìm thấy ứng dụng để in PDF. Vui lòng cài đặt Adobe Acrobat Reader.")
+                    except Exception as subprocess_error:
+                        messagebox.showerror("Error", f"Lỗi khi in hóa đơn qua subprocess: {subprocess_error}")
 
-            formatted_total_amount = format_currency(total_amount)
-            tb.Label(total_frame, text="TỔNG HÓA ĐƠN:", font=("Arial", 12, "bold")).grid(row=0, column=2,
-                                                                                         sticky="e", padx=10)
-            tb.Label(total_frame, text=formatted_total_amount, font=("Arial", 12, "bold")).grid(row=0, column=3,
-                                                                                                sticky="e", padx=10)
-
-            # Lời cảm ơn
-            thanks_frame = tb.Frame(main_frame)
-            thanks_frame.pack(fill="x", pady=10)
-            tb.Label(thanks_frame, text="Thank you for believing in us", font=("Arial", 12, "italic")).pack()
+            except Exception as e:
+                messagebox.showerror("Error", f"Lỗi khi in hóa đơn: {e}")
 
         add_window = tb.Toplevel(title="Thêm hóa đơn", minsize=(1280, 800))
         add_window.geometry("1280x800")
@@ -334,7 +396,10 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
         customer_list_frame.grid(row=1, column=0, padx=10, pady=10, sticky="news")
 
         customer_columns = ("cust_id", "cust_name", "contact", "address")
-        customer_tree = tb.Treeview(customer_list_frame, columns=customer_columns, show="headings")
+        customer_tree = tb.Treeview(customer_list_frame,
+                                    columns=customer_columns,
+                                    show="headings",
+                                    style="Custom.Treeview")
 
         # Setting headings and column properties explicitly
         customer_tree.heading("cust_id", text="Id")
@@ -377,11 +442,11 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
         service_qty_entry = tk.Entry(service_frame)
         service_qty_entry.grid(row=1, column=1, padx=10, pady=5, sticky="w")
 
-        add_to_bill_btn = tb.Button(service_frame, text="Thêm vào hóa đơn", bootstyle="primary",
+        add_to_bill_btn = tb.Button(service_frame, text="Thêm vào hóa đơn", bootstyle="success-outline",
                                     command=add_to_bill)
         add_to_bill_btn.grid(row=2, column=0, padx=10, pady=5, sticky="w")
 
-        remove_from_bill_btn = tb.Button(service_frame, text="Xóa khỏi hóa đơn", bootstyle="danger",
+        remove_from_bill_btn = tb.Button(service_frame, text="Xóa khỏi hóa đơn", bootstyle="danger-outline",
                                          command=remove_from_bill)
         remove_from_bill_btn.grid(row=2, column=1, padx=10, pady=5, sticky="w")
 
@@ -390,12 +455,22 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
         service_list_frame.grid(row=1, column=1, padx=10, pady=10, sticky="news")
 
         service_columns = ("service_id", "service_name", "category", "quantity", "price")
-        service_tree = tb.Treeview(service_list_frame, columns=service_columns, show="headings")
+        service_tree = tb.Treeview(service_list_frame,
+                                   columns=service_columns,
+                                   show="headings",
+                                   style="Custom.Treeview")
+
+
         for col in service_columns:
             service_tree.heading(col, text=col.replace("_", " ").title())
             service_tree.column(col, width=85)
         service_tree.grid(row=0, column=0, sticky="nsew")
 
+        service_tree.heading("service_id", text="Id")
+        service_tree.heading("service_name", text="Dịch vụ")
+        service_tree.heading("category", text="Danh mục")
+        service_tree.heading("quantity", text="Số lượng")
+        service_tree.heading("price", text="Giá")
         service_list_frame.grid_rowconfigure(0, weight=1)
         service_list_frame.grid_columnconfigure(0, weight=1)
 
@@ -424,7 +499,10 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
         bill_frame.grid(row=1, column=2, padx=10, pady=10, sticky="news")
 
         bill_columns = ("service_id_to_bill", "service_name_to_bill", "quantity_to_bill", "price_to_bill")
-        bill_tree = tb.Treeview(bill_frame, columns=bill_columns, show="headings")
+        bill_tree = tb.Treeview(bill_frame,
+                                columns=bill_columns,
+                                show="headings",
+                                style="Custom.Treeview")
 
         # Setting headings and column properties explicitly
         bill_tree.heading("service_id_to_bill", text="Id Dịch Vụ")
@@ -446,14 +524,27 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
         total_frame = tb.Frame(lf, bootstyle="secondary")
         total_frame.grid(row=2, column=2, padx=10, pady=10, sticky="new")
 
-        tk.Label(total_frame, text="Tổng hóa đơn").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        # Tiêu đề "Tổng hóa đơn" được nâng cấp với font và màu sắc
+        tk.Label(
+            total_frame,
+            text="Tổng hóa đơn:",
+            font=("Arial", 10, "bold"),
+            fg="#333",  # Màu chữ xám đậm
+        ).grid(row=0, column=0, padx=10, pady=5, sticky="w")
+
+        # Giá trị tổng hóa đơn được làm nổi bật với màu chữ xanh lá
         total_var = tk.StringVar(value="0")
-        total_label = tk.Label(total_frame, textvariable=total_var)
+        total_label = tk.Label(
+            total_frame,
+            textvariable=total_var,
+            font=("Arial", 10, "bold"),
+            fg="green",  # Màu chữ xanh lá để làm nổi bật giá trị
+        )
         total_label.grid(row=0, column=1, padx=10, pady=5, sticky="w")
 
         # Print Invoice Button
-        print_invoice_btn = tb.Button(lf, text="In hóa đơn", bootstyle="success",
-                                      command=lambda: [save_invoice(emp_id), show_invoice_preview()])
+        print_invoice_btn = tb.Button(lf, text="In hóa đơn", bootstyle="success-outline",
+                                      command=lambda: [save_invoice(emp_id), print_invoice()])
         print_invoice_btn.grid(row=4, column=2, padx=10, pady=10, sticky="new")
 
     def update_invoice():
@@ -580,14 +671,71 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn):
             messagebox.showerror("Error", str(e))
             db.rollback()
 
-    add_btn = tb.Button(funcbar, text="Thêm Hóa Đơn", command=add_invoice, bootstyle="success")
+    def search_invoice():
+        keyword = search_entry.get().strip()  # Lấy từ khóa tìm kiếm từ entry
+
+        # Xóa dữ liệu cũ trong bảng
+        for item in table.get_children():
+            table.delete(item)
+
+        if not keyword:
+            messagebox.showwarning("Cảnh báo", "Vui lòng nhập từ khóa để tìm kiếm.")
+            return
+
+        try:
+            # Sử dụng truy vấn của bạn và áp dụng tìm kiếm dựa trên từ khóa
+            cursor.execute(f"""
+                SELECT InvoiceTbl.InvoiceID, InvoiceTbl.InvoiceDate, CustomerTbl.CustName, 
+                       EmployeeTbl.EmpName, 
+                       SUM(COALESCE(InvoiceDetailTbl.TotalAmt, 0)) as TotalAmt
+                FROM InvoiceTbl
+                LEFT JOIN CustomerTbl ON InvoiceTbl.CustID = CustomerTbl.CustID
+                LEFT JOIN EmployeeTbl ON InvoiceTbl.EmpID = EmployeeTbl.EmpID
+                LEFT JOIN InvoiceDetailTbl ON InvoiceTbl.InvoiceID = InvoiceDetailTbl.InvoiceID
+                WHERE InvoiceTbl.InvoiceID LIKE %s
+                   OR CustomerTbl.CustName LIKE %s
+                   OR EmployeeTbl.EmpName LIKE %s
+                   OR InvoiceTbl.InvoiceDate LIKE %s
+                GROUP BY InvoiceTbl.InvoiceID, InvoiceTbl.InvoiceDate, CustomerTbl.CustName, 
+                         EmployeeTbl.EmpName
+            """, (
+                f"%{keyword}%",  # Tìm kiếm theo InvoiceID
+                f"%{keyword}%",  # Tìm kiếm theo CustName
+                f"%{keyword}%",  # Tìm kiếm theo EmpName
+                f"%{keyword}%"  # Tìm kiếm theo InvoiceDate
+            ))
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Đã xảy ra lỗi khi tìm kiếm: {e}")
+            return
+
+        data = cursor.fetchall()
+
+        if not data:
+            messagebox.showinfo("Thông báo", f"Không tìm thấy kết quả nào cho từ khóa '{keyword}'.")
+            return
+
+        # Hiển thị dữ liệu trong bảng
+        for item in data:
+            table.insert('', 'end', values=item)
+
+        # Xóa ô tìm kiếm sau khi hiển thị kết quả
+        search_entry.delete(0, 'end')
+
+    add_btn = tb.Button(funcbar, text="Thêm Hóa Đơn", command=add_invoice, bootstyle="success-outline")
     add_btn.grid(row=0, column=0, padx=5, pady=5)
 
-    update_btn = tb.Button(funcbar, text="Sửa Hóa Đơn", command=update_invoice, bootstyle="info")
+    update_btn = tb.Button(funcbar, text="Sửa Hóa Đơn", command=update_invoice, bootstyle="success-outline")
     update_btn.grid(row=0, column=1, padx=5, pady=5)
 
-    delete_btn = tb.Button(funcbar, text="Xóa Hóa Đơn", command=delete_invoice, bootstyle="danger")
+    delete_btn = tb.Button(funcbar, text="Xóa Hóa Đơn", command=delete_invoice, bootstyle="danger-outline")
     delete_btn.grid(row=0, column=2, padx=5, pady=5)
 
-    refresh_btn = tb.Button(funcbar, text="Làm Mới", command=fetch_and_insert_data, bootstyle="secondary")
+    refresh_btn = tb.Button(funcbar, text="Làm Mới", command=fetch_and_insert_data, bootstyle="secondary-outline")
     refresh_btn.grid(row=0, column=3, padx=5, pady=5)
+
+    search_entry = tb.Entry(funcbar, bootstyle="secondary", width=20)
+    search_entry.grid(row=0, column=6, padx=5, pady=10, sticky="we")
+
+    search_btn = tb.Button(funcbar, bootstyle="success-outline", text="Tìm kiếm", width=14, command=search_invoice)
+    search_btn.grid(row=0, column=7, padx=5, pady=10, sticky="e")
+

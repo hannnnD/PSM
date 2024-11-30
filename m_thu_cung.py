@@ -21,7 +21,18 @@ def show_thuCung(window, user_role, buttons, thuCung_btn):
         return
 
     clicked(thuCung_btn, buttons)
-
+    style = tb.Style()
+    style.configure("Custom.Treeview",
+                    borderwidth=1,
+                    relief="solid",  # Tạo viền quanh bảng
+                    rowheight=25,  # Điều chỉnh chiều cao hàng
+                    background="#fdfdfd",  # Màu nền
+                    foreground="#000")  # Màu chữ
+    style.configure("Custom.Treeview.Heading",
+                    background="#e1e1e1",  # Màu nền tiêu đề
+                    foreground="#000",  # Màu chữ tiêu đề
+                    borderwidth=1,
+                    relief="solid")  # Tạo viền cho tiêu đề
     thuCung_frame = tb.Labelframe(window, bootstyle="secondary", text="Quản lý lưu trú")
     thuCung_frame.grid(row=0, column=1, columnspan=5, padx=5, pady=5, sticky="nsew")
     thuCung_frame.columnconfigure(0, weight=1)
@@ -38,7 +49,8 @@ def show_thuCung(window, user_role, buttons, thuCung_btn):
     tree_scrollT.grid(row=0, rowspan=6, column=3, sticky="wnes", padx=5, pady=30)
 
     columns = ("tID", "tName", "tBreed", "tDOB", "pType", "tDate", "tRoom", "cID")
-    table = tb.Treeview(content_frameT, columns=columns, show='headings', yscrollcommand=tree_scrollT.set)
+    table = tb.Treeview(content_frameT, columns=columns, show='headings', yscrollcommand=tree_scrollT.set,
+                        style="Custom.Treeview")
     tree_scrollT.config(command=table.yview)
 
     table.heading("tID", text="Pet ID")
@@ -71,9 +83,14 @@ def show_thuCung(window, user_role, buttons, thuCung_btn):
         for item in table.get_children():
             table.delete(item)
         data = cursor.fetchall()
-        for item in data:
+
+        table.tag_configure('evenrow', background='#f2f2f2')
+        table.tag_configure('oddrow', background='#ffffff')
+        for i, item in enumerate(data):
+            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
             table.insert('', tb.END, values=(
-                f"P{item[0]}", item[1], item[2], item[3], item[4], item[5], f"PR{item[6]}", f"KH{item[7]}"))
+                f"P{item[0]}", item[1], item[2], item[3], item[4], item[5], f"PR{item[6]}", f"KH{item[7]}"), tags=(tag,))
+
 
     fetch_and_insert_data()
 
@@ -169,7 +186,7 @@ def show_thuCung(window, user_role, buttons, thuCung_btn):
             dob = dob_entry.entry.get()
             ptype = type_entry.get()
             date = date_entry.entry.get()
-            room = room_entry.get().strip("PR")
+            room = room_entry.get()
             customerID = cus_entry.get().strip("KH")
 
             if not pid or not pname or not breed or not dob or not ptype or not date or not room or not customerID:

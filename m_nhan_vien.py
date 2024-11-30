@@ -12,6 +12,19 @@ def show_nhanVien(window, user_role, buttons, nhanVien_btn):
         return
 
     clicked(nhanVien_btn, buttons)
+    style = tb.Style()
+    style.configure("Custom.Treeview",
+                    borderwidth=1,
+                    relief="solid",  # Tạo viền quanh bảng
+                    rowheight=25,  # Điều chỉnh chiều cao hàng
+                    background="#fdfdfd",  # Màu nền
+                    foreground="#000")  # Màu chữ
+    style.configure("Custom.Treeview.Heading",
+                    background="#e1e1e1",  # Màu nền tiêu đề
+                    foreground="#000",  # Màu chữ tiêu đề
+                    borderwidth=1,
+                    relief="solid")  # Tạo viền cho tiêu đề
+
 
     nhanVien_frame = tb.Labelframe(window, bootstyle="secondary", text="Quản lý nhân viên")
     nhanVien_frame.grid(row=0, column=1, columnspan=5, padx=5, pady=5, sticky="nsew")
@@ -34,7 +47,11 @@ def show_nhanVien(window, user_role, buttons, nhanVien_btn):
     columns = (
         "eID", "eName", "eDOB", "eGender", "eNumber", "eAddress", "eStartDate", "eSalary", "eWorkShift", "eStatus",
         "eNotes", "eRole")
-    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set)
+    # Áp dụng kiểu tùy chỉnh cho Treeview
+    table = tb.Treeview(content_frame, columns=columns, show='headings', yscrollcommand=tree_scroll.set,
+                        style="Custom.Treeview")
+
+
     tree_scroll.config(command=table.yview)
 
     table.heading("eID", text="ID")
@@ -76,10 +93,17 @@ def show_nhanVien(window, user_role, buttons, nhanVien_btn):
         for item in table.get_children():
             table.delete(item)
         data = cursor.fetchall()
-        for item in data:
+        def format_vnd(amount):
+            return f"{amount:,.0f}".replace(',', '.') + " VND"
+
+        table.tag_configure('evenrow', background='#f2f2f2')
+        table.tag_configure('oddrow', background='#ffffff')
+        for i, item in enumerate(data):
+            formatted_total = format_vnd(item[7])
+            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
             table.insert('', tb.END, values=(
-                f"NV{item[0]}", item[1], item[2], item[3], item[4], item[5], item[6], item[7], item[8], item[9],
-                item[10], item[11]))
+                f"NV{item[0]}", item[1], item[2], item[3], item[4], item[5], item[6], formatted_total, item[8], item[9],
+                item[10], item[11]), tags=(tag,))
 
     fetch_and_insert_data()
 
