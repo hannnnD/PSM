@@ -6,6 +6,7 @@ from m_hoa_don import show_hoaDon
 from m_khach_hang import show_khachHang
 from m_nha_cung_cap import show_nhaCungCap
 from m_nhan_vien import show_nhanVien
+from m_phieu_nhap_kho import show_phieuNhap
 from m_phong_thu import show_thuCungRoom
 from m_thong_ke import show_thongKe
 from m_thu_cung import show_thuCung
@@ -62,7 +63,9 @@ def main(user_role, emp_id):
                create_button(menu_frame, "img/work_light.png", "Nhân viên",
                              lambda: show_nhanVien(window, user_role, buttons, buttons[6]), 7, 0),
                create_button(menu_frame, "img/work_light.png", "Nhà cung cấp",
-                             lambda: show_nhaCungCap(window, user_role, buttons, buttons[7]), 8, 0)]
+                             lambda: show_nhaCungCap(window, user_role, buttons, buttons[7]), 8, 0),
+               create_button(menu_frame, "img/work_light.png", "Phiếu nhập kho",
+                             lambda: show_phieuNhap(window, user_role, buttons, buttons[8]), 9, 0)]
 
     # Chạy giao diện chính
     window.mainloop()
