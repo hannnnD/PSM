@@ -29,7 +29,7 @@ def show_thuCung(window, user_role, buttons, thuCung_btn):
                     background="#fdfdfd",  # Màu nền
                     foreground="#000")  # Màu chữ
     style.configure("Custom.Treeview.Heading",
-                    background="#e1e1e1",  # Màu nền tiêu đề
+                    background="#76EEC6",  # Màu nền tiêu đề
                     foreground="#000",  # Màu chữ tiêu đề
                     borderwidth=1,
                     relief="solid")  # Tạo viền cho tiêu đề

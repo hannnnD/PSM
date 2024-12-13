@@ -1,12 +1,15 @@
 import mysql.connector
+import pymysql
 
 def connect_to_db():
-    return mysql.connector.connect(
+    connection = pymysql.connect(
         host="localhost",
         user="root",
         password="",
         database="thuCung2"
     )
+    return connection
 
 db = connect_to_db()
 cursor = db.cursor()
+

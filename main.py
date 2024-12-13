@@ -4,6 +4,7 @@ import ttkbootstrap as tb
 from m_dich_vu import show_dichVu
 from m_hoa_don import show_hoaDon
 from m_khach_hang import show_khachHang
+from m_nha_cung_cap import show_nhaCungCap
 from m_nhan_vien import show_nhanVien
 from m_phong_thu import show_thuCungRoom
 from m_thong_ke import show_thongKe
@@ -59,7 +60,9 @@ def main(user_role, emp_id):
                create_button(menu_frame, "img/recipt_light.png", "Hóa đơn",
                              lambda: show_hoaDon(window, user_role, buttons, buttons[5], emp_id), 6, 0),
                create_button(menu_frame, "img/work_light.png", "Nhân viên",
-                             lambda: show_nhanVien(window, user_role, buttons, buttons[6]), 7, 0)]
+                             lambda: show_nhanVien(window, user_role, buttons, buttons[6]), 7, 0),
+               create_button(menu_frame, "img/work_light.png", "Nhà cung cấp",
+                             lambda: show_nhaCungCap(window, user_role, buttons, buttons[7]), 8, 0)]
 
     # Chạy giao diện chính
     window.mainloop()
