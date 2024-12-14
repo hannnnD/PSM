@@ -12,4 +12,3 @@ def connect_to_db():
 
 db = connect_to_db()
 cursor = db.cursor()
-

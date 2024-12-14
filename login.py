@@ -49,10 +49,6 @@ def check_credentials():
         return
 
     try:
-        # Kiểm tra kết nối cơ sở dữ liệu
-        if not db.is_connected():
-            db.reconnect()
-
         query = "SELECT * FROM usertbl WHERE username = %s AND password = %s"
         cursor.execute(query, (username, password))
         result = cursor.fetchone()
@@ -69,6 +65,7 @@ def check_credentials():
         error_label.configure(text=f"Lỗi cơ sở dữ liệu: {err}")
     except Exception as ex:
         error_label.configure(text=f"Lỗi không mong muốn: {ex}")
+        print(ex)
 
 # Các trường nhập liệu
 username_entry = customtkinter.CTkEntry(frame, width=250, placeholder_text="Tên đăng nhập")
