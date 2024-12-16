@@ -1,5 +1,4 @@
-import datetime
-from datetime import timedelta
+from datetime import timedelta, datetime
 from tkinter import messagebox
 import ttkbootstrap as tb
 from ttkbootstrap.widgets import DateEntry
@@ -129,16 +128,17 @@ def fetch_monthly_revenue(year):
     total_amounts = []
     for month in range(1, 13):
         cursor.execute(
-            "SELECT SUM(idt.TotalAmt) "
-            "FROM invoicedetailtbl AS idt "
-            "JOIN invoicetbl AS it ON idt.InvoiceID = it.InvoiceID "
-            "WHERE YEAR(STR_TO_DATE(it.InvoiceDate, '%m/%d/%Y')) = %s "
-            "AND MONTH(STR_TO_DATE(it.InvoiceDate, '%m/%d/%Y')) = %s",
+            r"SELECT SUM(idt.TotalAmt) "
+            r"FROM invoicedetailtbl AS idt "
+            r"JOIN invoicetbl AS it ON idt.InvoiceID = it.InvoiceID "
+            r"WHERE YEAR(STR_TO_DATE(it.InvoiceDate, '%%m/%%d/%%Y')) = %s "
+            r"AND MONTH(STR_TO_DATE(it.InvoiceDate, '%%m/%%d/%%Y')) = %s",
             (year, month)
         )
         result = cursor.fetchone()
         total_amounts.append(result[0] if result[0] is not None else 0)
     return total_amounts
+
 
 def update_monthly_graph(ax, canvas, year):
     total_amounts = fetch_monthly_revenue(year)
@@ -162,6 +162,7 @@ def update_monthly_graph(ax, canvas, year):
     ax.tick_params(axis='y', labelsize=6)
 
     canvas.draw()
+
 
 
 def show_thongKe(window, user_role, buttons, thongKe_btn):
@@ -243,9 +244,10 @@ def show_thongKe(window, user_role, buttons, thongKe_btn):
     monthly_tab = tb.Frame(notebook)
     notebook.add(monthly_tab, text="Thống kê theo tháng")
 
+    current_year = datetime.now().year
     year_var = tb.StringVar()
     year_combobox = tb.Combobox(monthly_tab, textvariable=year_var)
-    year_combobox['values'] = [year for year in range(2020, 2030)]
+    year_combobox['values'] = [year for year in range(current_year - 5, current_year + 5)]
     year_combobox.current(4)
     year_combobox.pack(fill="x", padx=10, pady=10)
 

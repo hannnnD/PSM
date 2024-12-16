@@ -20,7 +20,7 @@ frame = customtkinter.CTkFrame(window, width=350, height=450, corner_radius=20)
 frame.place(relx=0.5, rely=0.5, anchor=tkinter.CENTER)
 
 # Thêm logo
-logo_image = Image.open("img/pets.png")  # Đảm bảo bạn có tệp logo.png trong thư mục dự án
+logo_image = Image.open("img/pets.png")
 logo_image = logo_image.resize((80, 80), Image.Resampling.LANCZOS)
 logo_photo = ImageTk.PhotoImage(logo_image)
 logo_label = customtkinter.CTkLabel(frame, image=logo_photo, text="")
@@ -32,11 +32,6 @@ label_title.place(x=110, y=120)
 
 # Đóng cửa sổ
 def destroy_window():
-    try:
-        cursor.close()
-        db.close()
-    except mysql.connector.Error:
-        pass
     window.destroy()
 
 # Kiểm tra thông tin đăng nhập
@@ -84,5 +79,5 @@ error_label = customtkinter.CTkLabel(frame, text="", text_color="red", font=("Mo
 error_label.place(x=50, y=320)
 
 # Chạy ứng dụng
-window.protocol("WM_DELETE_WINDOW", destroy_window)  # Đảm bảo đóng kết nối khi thoát
+window.protocol("WM_DELETE_WINDOW", destroy_window)
 window.mainloop()
