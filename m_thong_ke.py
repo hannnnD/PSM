@@ -6,6 +6,7 @@ from utils import clicked
 from DB import cursor
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import pygal
 
 
 def format_vnd(amount):
@@ -112,6 +113,45 @@ def fetch_daily_services(date):
     result = cursor.fetchone()
     return result[0] if result[0] is not None else 0
 
+def fetch_daily_hot_services(date):
+    cursor.execute(
+        """
+        SELECT idt.ServiceID, SUM(idt.SQuantity) AS TotalQuantity 
+        FROM invoicedetailtbl AS idt
+        JOIN invoicetbl AS it ON idt.InvoiceID = it.InvoiceID
+        WHERE it.InvoiceDate = %s
+        GROUP BY idt.ServiceID
+        ORDER BY TotalQuantity DESC
+        LIMIT 1
+        """,
+        (date,)
+    )
+    result = cursor.fetchone()
+    return result[0] if result else None
+
+def fetch_daily_hot_services_counter(date):
+    cursor.execute(
+        """
+        SELECT idt.ServiceID, SUM(idt.SQuantity) AS TotalQuantity 
+        FROM invoicedetailtbl AS idt
+        JOIN invoicetbl AS it ON idt.InvoiceID = it.InvoiceID
+        WHERE it.InvoiceDate = %s
+        GROUP BY idt.ServiceID
+        ORDER BY TotalQuantity DESC
+        LIMIT 1
+        """,
+        (date,)
+    )
+    result = cursor.fetchone()
+    return result[1] if result else 0
+
+def fetch_hSevriceName(service_id):
+    cursor.execute(
+        "SELECT ServiceName FROM servicetbl WHERE ServiceID = %s",
+        (service_id,)
+    )
+    result = cursor.fetchone()
+    return result[0] if result else None
 
 def update_daily_stats(date_var, revenue_label, customers_label, services_label):
     date = date_var.entry.get()  # Lấy giá trị ngày từ entry
@@ -199,6 +239,9 @@ def show_thongKe(window, user_role, buttons, thongKe_btn):
     services_label = tb.Label(daily_tab, text="Số dịch vụ đã tiêu thụ: ", bootstyle="info")
     services_label.pack(fill="x", padx=10, pady=5)
 
+    hot_services_label = tb.Label(daily_tab, text="Dịch vụ bán chạy nhất: ", bootstyle="info")
+    hot_services_label.pack(fill="x", padx=10, pady=5)
+
     # Create Matplotlib figure and canvas
     fig_daily = Figure(figsize=(6, 4), dpi=100)
     ax_daily = fig_daily.add_subplot(111)
@@ -212,11 +255,14 @@ def show_thongKe(window, user_role, buttons, thongKe_btn):
         revenue = fetch_daily_revenue(date)
         customers = fetch_daily_customers(date)
         services = fetch_daily_services(date)
+        hot_services = fetch_daily_hot_services(date)
+        hot_service_name = fetch_hSevriceName(hot_services)
 
         # Cập nhật nhãn
         revenue_label.config(text=f"Tổng doanh thu: {format_vnd(revenue)}")
         customers_label.config(text=f"Tổng số khách hàng: {customers}")
         services_label.config(text=f"Số dịch vụ đã tiêu thụ: {services}")
+        hot_services_label.config(text=f"Dịch vụ bán chạy nhất trong ngày: {hot_service_name} ({hot_services})")
 
         # Cập nhật biểu đồ
         ax_daily.clear()
