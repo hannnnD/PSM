@@ -187,6 +187,7 @@ def show_thuCung(window, user_role, buttons, thuCung_btn):
             ptype = type_entry.get()
             date = date_entry.entry.get()
             room = room_entry.get()
+            room = room.replace("PR", "")
             customerID = cus_entry.get().strip("KH")
 
             if not pid or not pname or not breed or not dob or not ptype or not date or not room or not customerID:
