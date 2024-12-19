@@ -6,7 +6,11 @@ from utils import clicked
 from DB import cursor
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import pygal
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.animation as animation
+
+plt.style.use('seaborn-v0_8-pastel')
 
 
 def format_vnd(amount):
@@ -84,7 +88,7 @@ def fetch_daily_revenue(date):
         "SELECT SUM(idt.TotalAmt) "
         "FROM invoicedetailtbl AS idt "
         "JOIN invoicetbl AS it ON idt.InvoiceID = it.InvoiceID "
-        "WHERE it.InvoiceDate = %s",  # So sánh trực tiếp ngày dạng text
+        "WHERE it.InvoiceDate = %s",
         (date,)
     )
     result = cursor.fetchone()
@@ -113,6 +117,7 @@ def fetch_daily_services(date):
     result = cursor.fetchone()
     return result[0] if result[0] is not None else 0
 
+
 def fetch_daily_hot_services(date):
     cursor.execute(
         """
@@ -128,6 +133,7 @@ def fetch_daily_hot_services(date):
     )
     result = cursor.fetchone()
     return result[0] if result else None
+
 
 def fetch_daily_hot_services_counter(date):
     cursor.execute(
@@ -145,13 +151,15 @@ def fetch_daily_hot_services_counter(date):
     result = cursor.fetchone()
     return result[1] if result else 0
 
+
 def fetch_hSevriceName(service_id):
     cursor.execute(
-        "SELECT ServiceName FROM servicetbl WHERE ServiceID = %s",
+        "SELECT SName FROM servicetbl WHERE ServiceID = %s",
         (service_id,)
     )
     result = cursor.fetchone()
     return result[0] if result else None
+
 
 def update_daily_stats(date_var, revenue_label, customers_label, services_label):
     date = date_var.entry.get()  # Lấy giá trị ngày từ entry
@@ -163,6 +171,7 @@ def update_daily_stats(date_var, revenue_label, customers_label, services_label)
     revenue_label.config(text=f"Tổng doanh thu: {format_vnd(revenue)}")
     customers_label.config(text=f"Tổng số khách hàng: {customers}")
     services_label.config(text=f"Số dịch vụ đã tiêu thụ: {services}")
+
 
 def fetch_monthly_revenue(year):
     total_amounts = []
@@ -178,6 +187,45 @@ def fetch_monthly_revenue(year):
         result = cursor.fetchone()
         total_amounts.append(result[0] if result[0] is not None else 0)
     return total_amounts
+
+
+def fetch_monthly_service_usage(year):
+    count_usage = []
+    for month in range(1, 13):
+        cursor.execute(
+            r"SELECT SUM(idt.TotalAmt) "
+            r"FROM invoicedetailtbl AS idt "
+            r"JOIN invoicetbl AS it ON idt.InvoiceID = it.InvoiceID "
+            r"WHERE YEAR(STR_TO_DATE(it.InvoiceDate, '%%m/%%d/%%Y')) = %s "
+            r"AND MONTH(STR_TO_DATE(it.InvoiceDate, '%%m/%%d/%%Y')) = %s",
+            (year, month)
+        )
+        result = cursor.fetchone()
+        count_usage.append(result[0] if result[0] is not None else 0)
+    return count_usage
+
+def update_monthly_service_usage_graph(ax, canvas, year):
+    count_usage = fetch_monthly_service_usage(year)
+
+    month_names = [
+        "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+        "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+    ]
+
+    ax.clear()
+    ax.set_facecolor('#F7F7F7')
+    bars = ax.bar(range(1, 13), count_usage, color='#FFC5C5')
+    for bar, total in zip(bars, count_usage):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), format_vnd(total), ha="center", va="bottom",
+                fontsize=6)
+    ax.set_xticks(range(1, 13))
+    ax.set_xticklabels(month_names)
+    ax.set_ylabel("Tổng số lượt sử dụng", fontsize=8)
+    ax.set_title("Tổng nhu cầu hàng tháng", fontsize=10)
+    ax.tick_params(axis='x', labelsize=6)
+    ax.tick_params(axis='y', labelsize=6)
+
+    canvas.draw()
 
 
 def update_monthly_graph(ax, canvas, year):
@@ -202,7 +250,6 @@ def update_monthly_graph(ax, canvas, year):
     ax.tick_params(axis='y', labelsize=6)
 
     canvas.draw()
-
 
 
 def show_thongKe(window, user_role, buttons, thongKe_btn):
@@ -309,3 +356,72 @@ def show_thongKe(window, user_role, buttons, thongKe_btn):
     monthly_update_button.pack(fill="x", padx=10, pady=10)
 
     update_monthly_graph(ax_monthly, canvas_monthly, int(year_combobox.get()))
+
+
+    # # ======== Tab Thống kê theo dịch vụ ========
+    # monthly_tab = tb.Frame(notebook)
+    # notebook.add(monthly_tab, text="Thống kê theo dịch vụ")
+    #
+    # current_year = datetime.now().year
+    # year_var = tb.StringVar()
+    # year_combobox = tb.Combobox(monthly_tab, textvariable=year_var)
+    # year_combobox['values'] = [year for year in range(current_year - 5, current_year + 5)]
+    # year_combobox.current(4)
+    # year_combobox.pack(fill="x", padx=10, pady=10)
+    #
+    # fig_monthly = Figure(figsize=(6, 4), dpi=100)
+    # ax_monthly = fig_monthly.add_subplot(111)
+    # canvas_monthly = FigureCanvasTkAgg(fig_monthly, master=monthly_tab)
+    # canvas_monthly.get_tk_widget().pack(fill="both", expand=True)
+    #
+    # monthly_update_button = tb.Button(
+    #     monthly_tab, text="Cập nhật",
+    #     command=lambda: update_monthly_graph(ax_monthly, canvas_monthly, int(year_var.get()))
+    # )
+    # monthly_update_button.pack(fill="x", padx=10, pady=10)
+    #
+    # update_monthly_graph(ax_monthly, canvas_monthly, int(year_combobox.get()))
+
+
+    # ======== Tab Thống kê theo từng dịch vụ ========
+    monthly_service_tab = tb.Frame(notebook)
+    notebook.add(monthly_service_tab, text="Thống kê theo từng dịch vụ")
+
+    current_year = datetime.now().year
+    year_var = tb.StringVar()
+    year_combobox = tb.Combobox(monthly_service_tab, textvariable=year_var)
+    year_combobox['values'] = [year for year in range(current_year - 5, current_year + 5)]
+    year_combobox.current(4)
+    year_combobox.pack(fill="x", padx=10, pady=10)
+
+
+    def get_service_name():
+        cursor.execute(
+            "SELECT SName FROM servicetbl"
+        )
+        results = cursor.fetchall()
+        service_names = []
+
+        for row in results:
+            service_names.append(row[0])
+
+        return service_names
+
+    service_var = tb.StringVar()
+    sercice_combobox = tb.Combobox(monthly_service_tab, textvariable=service_var)
+    sercice_combobox['values'] = get_service_name()
+    sercice_combobox.current(4)
+    sercice_combobox.pack(fill="x", padx=10, pady=10)
+
+    fig_monthly_service_usage = Figure(figsize=(6, 4), dpi=100)
+    ax_monthly = fig_monthly.add_subplot(111)
+    canvas_monthly = FigureCanvasTkAgg(fig_monthly_service_usage, master=monthly_service_tab)
+    canvas_monthly.get_tk_widget().pack(fill="both", expand=True)
+
+    monthly_update_button = tb.Button(
+        monthly_service_tab, text="Cập nhật",
+        command=lambda: update_monthly_service_usage_graph(ax_monthly, canvas_monthly, int(year_var.get()))
+    )
+    monthly_update_button.pack(fill="x", padx=10, pady=10)
+
+    update_monthly_service_usage_graph(ax_monthly, canvas_monthly, int(year_combobox.get()))
