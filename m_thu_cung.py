@@ -126,7 +126,7 @@ def show_thuCung(window, user_role, buttons, thuCung_btn):
         dob_entry = tb.DateEntry(lf, width=16)
         dob_entry.grid(row=3, column=2, padx=10, pady=5, sticky="new")
 
-        ptype = ["Thú", "Chim", "Cá", "Khác"]
+        ptype = ["Chó", "Mèo", "Hamster", "Khác"]
         type_lb = tb.Label(lf, bootstyle="secondary", text="Loài")
         type_lb.grid(row=4, column=0, padx=10, pady=5, sticky="new")
         type_entry = tb.Combobox(lf, width=16, values=ptype)

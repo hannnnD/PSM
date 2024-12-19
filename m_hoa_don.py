@@ -312,7 +312,7 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn, emp_id):
                     service_name = values[1]
                     quantity = int(values[2])
                     price = float(values[3])
-                    total = quantity * price
+                    total = price
                     total_amount += total
 
                     table_data.append([
@@ -490,8 +490,16 @@ def show_hoaDon(window, user_role, buttons, hoaDon_btn, emp_id):
         kID = result[0] + 1 if result and result[0] is not None else "No ID"
         invoice_id.insert(0, kID)
 
-        tk.Label(bill_info_frame, text="Ngày xuất hóa đơn").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        tb.Label(bill_info_frame, text="Ngày xuất hóa đơn").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+
+        # DateEntry của ttkbootstrap
         invoice_date = tb.DateEntry(bill_info_frame)
+        invoice_date.grid(row=1, column=1, padx=10, pady=5)
+
+        # Thay đổi giá trị ban đầu thành định dạng d/m/y
+        current_date = datetime.strptime(invoice_date.entry.get(), "%m/%d/%Y").strftime("%d/%m/%Y")
+        invoice_date.entry.delete(0, "end")
+        invoice_date.entry.insert(0, current_date)
         invoice_date.grid(row=1, column=1, padx=10, pady=5, sticky="w")
 
         # Bill Frame

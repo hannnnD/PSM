@@ -50,7 +50,7 @@ def main(user_role, emp_id):
     # Danh sách các nút
     buttons = [create_button(menu_frame, "img/stats_light.png", "Thống kê",
                              lambda: show_thongKe(window, user_role, buttons, buttons[0]), 1, 0),
-               create_button(menu_frame, "img/customer_light.png", "Khách hàng",
+               create_button(menu_frame, "img/customer.png", "Khách hàng",
                              lambda: show_khachHang(window, user_role, buttons, buttons[1]), 2, 0),
                create_button(menu_frame, "img/animal-shelter.png", "Phòng thú",
                              lambda: show_thuCungRoom(window, user_role, buttons, buttons[2]), 3, 0),
@@ -62,9 +62,9 @@ def main(user_role, emp_id):
                              lambda: show_hoaDon(window, user_role, buttons, buttons[5], emp_id), 6, 0),
                create_button(menu_frame, "img/work_light.png", "Nhân viên",
                              lambda: show_nhanVien(window, user_role, buttons, buttons[6]), 7, 0),
-               create_button(menu_frame, "img/work_light.png", "Nhà cung cấp",
+               create_button(menu_frame, "img/agreement.png", "Nhà cung cấp",
                              lambda: show_nhaCungCap(window, user_role, buttons, buttons[7]), 8, 0),
-               create_button(menu_frame, "img/work_light.png", "Phiếu nhập kho",
+               create_button(menu_frame, "img/warehouse.png", "Phiếu nhập kho",
                              lambda: show_phieuNhap(window, user_role, buttons, buttons[8]), 9, 0)]
 
     # Chạy giao diện chính
