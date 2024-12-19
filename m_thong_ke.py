@@ -386,7 +386,6 @@ def show_thongKe(window, user_role, buttons, thongKe_btn):
     # ======== Tab Thống kê theo từng dịch vụ ========
     monthly_service_tab = tb.Frame(notebook)
     notebook.add(monthly_service_tab, text="Thống kê theo từng dịch vụ")
-
     current_year = datetime.now().year
     year_var = tb.StringVar()
     year_combobox = tb.Combobox(monthly_service_tab, textvariable=year_var)
